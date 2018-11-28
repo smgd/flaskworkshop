@@ -1,4 +1,4 @@
-from flask import Flask, render_template, flash, redirect, url_for, session, logging
+from flask import Flask, render_template, flash, redirect, url_for, session, logging, request
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
 
@@ -48,3 +48,7 @@ class RegisterForm(Form):
         validators.EqualTo('confirm', message='Passwords do not match')
     ])
     confirm = PasswordField('Confirm Password')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    return render_template('register.html')
