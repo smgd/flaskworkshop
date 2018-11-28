@@ -19,12 +19,23 @@ POSTGRES = {
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://%(user)s@%(host)s:%(port)s/%(db)s' % POSTGRES
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+def sql(rawSql, sqlVars={}):
+    assert type(rawSql) == str
+    assert type(sqlVars) == dict
+    res = db.session.execute(rawSql, sqlVars)
+    db.session.commit()
+    return res
+
 db.init_app(app)
 
 articles_dict = articles_base()
 
 @app.route('/')
 def index():
+    sql("INSERT INTO users(name) VALUES ('Mike Jorah') ON CONFLICT (name) DO NOTHING;")
+    sql("INSERT INTO users(username) VALUES ('mike666') ON CONFLICT (name) DO NOTHING;")
+    sql("INSERT INTO users(password) VALUES ('89756') ON CONFLICT (name) DO NOTHING;")
+    sql("INSERT INTO users(email) VALUES ('sdf@sdf.com') ON CONFLICT (name) DO NOTHING;")
     return render_template('index.html')
 
 @app.route('/about')
@@ -51,4 +62,9 @@ class RegisterForm(Form):
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    return render_template('register.html')
+    form = RegisterForm(request.form)
+
+    if request.method == 'POST' and form.validate():
+        render_template('register.html', form=form)
+
+    return render_template('register.html', form=form)
