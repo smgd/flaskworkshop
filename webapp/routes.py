@@ -2,6 +2,7 @@ from flask import Flask, render_template, flash, redirect, url_for, session, log
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from flask_mysqldb import MySQL
+from functools import wraps
 
 from webapp.models import db
 from webapp import app
@@ -55,7 +56,18 @@ def login():
 
     return render_template('login.html')
 
+def is_logged_in(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if 'logged_in' in session:
+            return f(*args, **kwargs)
+        else:
+            flash('Unauthorized, please login', 'danger')
+            return redirect(url_for('login'))
+    return wrap
+
 @app.route('/logout')
+@is_logged_in
 def logout():
     session.clear()
     flash('You are logged out', 'success')
@@ -69,9 +81,40 @@ def articles():
 def article(id):
     return render_template('article.html', article=articles_dict[id - 1])
 
+@app.route('/add_article', methods=['GET', 'POST'])
+@is_logged_in
+def add_article():
+    form = ArticleForm(request.form)
+
+    if request.method == 'POST' and form.validate():
+        title = form.title.data
+        body = form.body.data
+        cur = mysql.connection.cursor()
+
+        cur.execute("INSERT INTO articles(title, body, author) VALUES(%s, %s, %s)", (title, body, session['username']))
+        mysql.connection.commit()
+        cur.close()
+
+        flash('Article created', 'success')
+
+        return redirect(url_for('dashboard'))
+
+    return render_template('add_article.html', form=form)
+
 @app.route('/dashboard')
+@is_logged_in
 def dashboard():
-    return render_template('dashboard.html')
+    cur = mysql.connection.cursor()
+    result = cur.execute("SELECT * FROM articles")
+
+    articles = cur.fetchall()
+    cur.close()
+
+    if result > 0:
+        return render_template('dashboard.html', articles=articles)
+    else:
+        msg = 'No articles found'
+        return render_template('dashboard.html', msg=msg)
 
 class RegisterForm(Form):
     name = StringField('Name', [validators.Length(min=1, max=100)])
@@ -82,6 +125,10 @@ class RegisterForm(Form):
         validators.EqualTo('confirm', message='Passwords do not match')
     ])
     confirm = PasswordField('Confirm Password')
+
+class ArticleForm(Form):
+    title = StringField('Title', [validators.Length(min=1, max=200)])
+    body = TextAreaField('Body', [validators.Length(min=30)])
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
