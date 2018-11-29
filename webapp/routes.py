@@ -75,7 +75,17 @@ def logout():
 
 @app.route('/articles')
 def articles():
-    return render_template('articles.html', articles=articles_dict)
+    cur = mysql.connection.cursor()
+    result = cur.execute("SELECT * FROM articles")
+
+    articles = cur.fetchall()
+    cur.close()
+
+    if result > 0:
+        return render_template('articles.html', articles=articles)
+    else:
+        msg = 'No articles found'
+        return render_template('articles.html', msg=msg)
 
 @app.route('/article/<int:id>')
 def article(id):
