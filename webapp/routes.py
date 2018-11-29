@@ -4,7 +4,6 @@ from passlib.hash import sha256_crypt
 from flask_mysqldb import MySQL
 from functools import wraps
 
-from webapp.models import db
 from webapp import app
 from webapp.data import articles_base
 
@@ -94,7 +93,6 @@ def article(id):
 
 
     article = cur.fetchone()
-    print(article)
     cur.close()
 
     if result > 0:
