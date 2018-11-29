@@ -89,7 +89,19 @@ def articles():
 
 @app.route('/article/<int:id>')
 def article(id):
-    return render_template('article.html', article=articles_dict[id - 1])
+    cur = mysql.connection.cursor()
+    result = cur.execute("SELECT * FROM articles WHERE id=%s",[id])
+
+
+    article = cur.fetchone()
+    print(article)
+    cur.close()
+
+    if result > 0:
+        return render_template('article.html', article=article)
+    else:
+        flash('No such article')
+        return redirect(url_for('articles'))
 
 @app.route('/add_article', methods=['GET', 'POST'])
 @is_logged_in
@@ -110,6 +122,35 @@ def add_article():
         return redirect(url_for('dashboard'))
 
     return render_template('add_article.html', form=form)
+
+@app.route('/edit_article/<int:id>', methods=['GET', 'POST'])
+@is_logged_in
+def edit_article(id):
+    cur = mysql.connection.cursor()
+
+    result = cur.execute("SELECT * FROM articles WHERE id=%s", [id])
+
+    article = cur.fetchone()
+
+    form = ArticleForm(request.form)
+
+    form.title.data = article['title']
+    form.body.data = article['body']
+
+    if request.method == 'POST' and form.validate():
+        title = form.title.data
+        body = form.body.data
+        cur = mysql.connection.cursor()
+
+        cur.execute("UPDATE articles SET title=%s, body=%s WHERE id=%s", (title, body, id))
+        mysql.connection.commit()
+        cur.close()
+
+        flash('Article created', 'success')
+
+        return redirect(url_for('dashboard'))
+
+    return render_template('edit_article.html', form=form)
 
 @app.route('/dashboard')
 @is_logged_in

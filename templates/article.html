@@ -1,7 +1,8 @@
 {% extends 'layout.html' %}
 
 {% block body %}
-    <h1>{{article['title']}}</h1>
-    <h4>Created by {{article['author']}}</h4>
-    <p>{{article['body']}}</p>
+    <h1>{{article.title}}</h1>
+    <small>Written by {{article.author}} on {{article.create_date}}</small>
+    <hr>
+    <div>{{article.body | safe}}</div>
 {% endblock %}
