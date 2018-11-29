@@ -8,7 +8,7 @@ from webapp import app
 from webapp.data import articles_base
 
 app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'soapman'
+app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = ''
 app.config['MYSQL_DB'] = 'flaskworkshop'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
@@ -25,6 +25,42 @@ def index():
 def about():
     return render_template('about.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password_candidate = request.form['password']
+
+        cur = mysql.connection.cursor()
+
+        result = cur.execute('SELECT * FROM users WHERE username = %s', [username])
+
+        if result > 0:
+            data = cur.fetchone()
+            password = data['password']
+            cur.close()
+            if sha256_crypt.verify(password_candidate, password):
+                session['logged_in'] = True
+                session['username'] = username
+
+                flash('You are logged in', 'success')
+                return redirect(url_for('dashboard'))
+            else:
+                error = 'Invalid password'
+                return render_template('login.html', error=error)
+        else:
+            cur.close()
+            error = 'Username not found'
+            return render_template('login.html', error=error)
+
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('You are logged out', 'success')
+    return redirect(url_for('login'))
+
 @app.route('/articles')
 def articles():
     return render_template('articles.html', articles=articles_dict)
@@ -32,6 +68,10 @@ def articles():
 @app.route('/article/<int:id>')
 def article(id):
     return render_template('article.html', article=articles_dict[id - 1])
+
+@app.route('/dashboard')
+def dashboard():
+    return render_template('dashboard.html')
 
 class RegisterForm(Form):
     name = StringField('Name', [validators.Length(min=1, max=100)])
@@ -63,6 +103,6 @@ def register():
 
         flash('You are now registered and can log in', 'success')
 
-        redirect(url_for('index'))
+        return redirect(url_for('login'))
 
     return render_template('register.html', form=form)
