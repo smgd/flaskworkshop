@@ -1,41 +1,24 @@
 from flask import Flask, render_template, flash, redirect, url_for, session, logging, request
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
+from flask_mysqldb import MySQL
 
 from webapp.models import db
 from webapp import app
 from webapp.data import articles_base
 
+app.config['MYSQL_HOST'] = 'localhost'
+app.config['MYSQL_USER'] = 'soapman'
+app.config['MYSQL_PASSWORD'] = ''
+app.config['MYSQL_DB'] = 'flaskworkshop'
+app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
-
-POSTGRES = {
-    'user': 'soapman',
-    # 'pw': 'password',
-    'db': 'flaskworkshop',
-    'host': 'localhost',
-    'port': '5432',
-}
-
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://%(user)s@%(host)s:%(port)s/%(db)s' % POSTGRES
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-def sql(rawSql, sqlVars={}):
-    assert type(rawSql) == str
-    assert type(sqlVars) == dict
-    res = db.session.execute(rawSql, sqlVars)
-    db.session.commit()
-    return res
-
-db.init_app(app)
+mysql = MySQL(app)
 
 articles_dict = articles_base()
 
 @app.route('/')
 def index():
-    sql("INSERT INTO users(name) VALUES ('Mike Jorah') ON CONFLICT (name) DO NOTHING;")
-    sql("INSERT INTO users(username) VALUES ('mike666') ON CONFLICT (name) DO NOTHING;")
-    sql("INSERT INTO users(password) VALUES ('89756') ON CONFLICT (name) DO NOTHING;")
-    sql("INSERT INTO users(email) VALUES ('sdf@sdf.com') ON CONFLICT (name) DO NOTHING;")
     return render_template('index.html')
 
 @app.route('/about')
@@ -65,6 +48,21 @@ def register():
     form = RegisterForm(request.form)
 
     if request.method == 'POST' and form.validate():
-        render_template('register.html', form=form)
+        name = form.name.data
+        email = form.email.data
+        username = form.username.data
+        password = sha256_crypt.encrypt(str(form.password.data))
+
+        cur = mysql.connection.cursor()
+
+        cur.execute('INSERT INTO users(name, email, username, password) VALUES(%s, %s, %s, %s)', (name, email, username, password))
+
+        mysql.connection.commit()
+
+        cur.close()
+
+        flash('You are now registered and can log in', 'success')
+
+        redirect(url_for('index'))
 
     return render_template('register.html', form=form)
