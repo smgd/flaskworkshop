@@ -13,23 +13,13 @@ class User(db.Model):
     def __repr__(self):
         return f"User('{self.username}', '{self.email}', '{self.name}')"
 
-    # def __init__(self, name, username, email, password):
-    #     self.name = name
-    #     self.username = username
-    #     self.email = email
-    #     self.password = password
-
 class Article(db.Model):
     # __tablename__ = 'article'
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     body = db.Column(db.Text, nullable=False)
-    date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow().strftime('%m %d %Y - %H:%M'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
     def __repr__(self):
         return f"Article('{self.title}', '{self.body}')"
-
-    # def __init__(self, title, body):
-    #     self.title = title
-    #     self.body = body
