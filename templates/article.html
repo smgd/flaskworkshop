@@ -2,7 +2,7 @@
 
 {% block body %}
     <h1>{{article.title}}</h1>
-    <small>Written by {{article.author}} on {{article.create_date}}</small>
+    <small>Written by {{article.author.username}} on {{article.date_created}}</small>
     <hr>
     <div>{{article.body | safe}}</div>
 {% endblock %}

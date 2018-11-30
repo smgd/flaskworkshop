@@ -2,8 +2,8 @@ from flask import Flask, render_template, flash, redirect, url_for, session, log
 from passlib.hash import sha256_crypt
 from functools import wraps
 
-from webapp import app
-from webapp.models import mysql
+from webapp import app, db
+from webapp.models import User, Article
 from webapp.forms import RegisterForm, ArticleForm
 
 def is_logged_in(f):
@@ -31,13 +31,10 @@ def login():
         username = request.form['username']
         password_candidate = request.form['password']
 
-        cur = mysql.connection.cursor()
-        result = cur.execute('SELECT * FROM users WHERE username = %s', [username])
+        user = User.query.filter_by(username=username).first()
 
-        if result > 0:
-            data = cur.fetchone()
-            password = data['password']
-            cur.close()
+        if user:
+            password = user.password
             if sha256_crypt.verify(password_candidate, password):
                 session['logged_in'] = True
                 session['username'] = username
@@ -48,7 +45,6 @@ def login():
                 error = 'Invalid password'
                 return render_template('login.html', error=error)
         else:
-            cur.close()
             error = 'Username not found'
             return render_template('login.html', error=error)
     return render_template('login.html')
@@ -62,12 +58,9 @@ def logout():
 
 @app.route('/articles')
 def articles():
-    cur = mysql.connection.cursor()
-    result = cur.execute("SELECT * FROM articles")
-    articles = cur.fetchall()
-    cur.close()
+    articles = Article.query.all()
 
-    if result > 0:
+    if articles != []:
         return render_template('articles.html', articles=articles)
     else:
         msg = 'No articles found'
@@ -75,12 +68,9 @@ def articles():
 
 @app.route('/article/<int:id>')
 def article(id):
-    cur = mysql.connection.cursor()
-    result = cur.execute("SELECT * FROM articles WHERE id=%s",[id])
-    article = cur.fetchone()
-    cur.close()
+    article = Article.query.filter_by(id=id).first()
 
-    if result > 0:
+    if article:
         return render_template('article.html', article=article)
     else:
         flash('No such article')
@@ -94,11 +84,11 @@ def add_article():
     if request.method == 'POST' and form.validate():
         title = form.title.data
         body = form.body.data
-        cur = mysql.connection.cursor()
 
-        cur.execute("INSERT INTO articles(title, body, author) VALUES(%s, %s, %s)", (title, body, session['username']))
-        mysql.connection.commit()
-        cur.close()
+        user_id = User.query.filter_by(username=session['username']).first().id
+        article = Article(title=title, body=body, user_id=user_id)
+        db.session.add(article)
+        db.session.commit()
 
         flash('Article created', 'success')
         return redirect(url_for('dashboard'))
@@ -107,36 +97,34 @@ def add_article():
 @app.route('/edit_article/<int:id>', methods=['GET', 'POST'])
 @is_logged_in
 def edit_article(id):
-    cur = mysql.connection.cursor()
-    result = cur.execute("SELECT * FROM articles WHERE id=%s", [id])
-    article = cur.fetchone()
+    article = Article.query.filter_by(id=id).first()
 
     form = ArticleForm(request.form)
 
-    form.title.data = article['title']
-    form.body.data = article['body']
+    form.title.data = article.title
+    form.body.data = article.body
 
     if request.method == 'POST' and form.validate():
         title = request.form['title']
         body = request.form['body']
 
-        cur.execute("UPDATE articles SET title=%s, body=%s WHERE id=%s", (title, body, id))
-        mysql.connection.commit()
-        cur.close()
+        article.title = title
+        article.body = body
+
+        db.session.commit()
 
         flash('Article created', 'success')
         return redirect(url_for('dashboard'))
 
-    cur.close()
     return render_template('edit_article.html', form=form)
 
 @app.route('/delete_article/<int:id>', methods = ['POST'])
 @is_logged_in
 def delete_article(id):
-    cur = mysql.connection.cursor()
-    cur.execute("DELETE FROM articles WHERE id=%s", [id])
-    mysql.connection.commit()
-    cur.close()
+    article = Article.query.filter_by(id=id).first()
+
+    db.session.delete(article)
+    db.session.commit()
 
     flash('Article deleted', 'success')
     return redirect(url_for('dashboard'))
@@ -144,12 +132,9 @@ def delete_article(id):
 @app.route('/dashboard')
 @is_logged_in
 def dashboard():
-    cur = mysql.connection.cursor()
-    result = cur.execute("SELECT * FROM articles")
-    articles = cur.fetchall()
-    cur.close()
+    articles = Article.query.all()
 
-    if result > 0:
+    if articles != []:
         return render_template('dashboard.html', articles=articles)
     else:
         msg = 'No articles found'
@@ -165,10 +150,9 @@ def register():
         username = form.username.data
         password = sha256_crypt.encrypt(str(form.password.data))
 
-        cur = mysql.connection.cursor()
-        cur.execute('INSERT INTO users(name, email, username, password) VALUES(%s, %s, %s, %s)', (name, email, username, password))
-        mysql.connection.commit()
-        cur.close()
+        user = User(name=name, email=email, username=username, password=password)
+        db.session.add(user)
+        db.session.commit()
 
         flash('You are now registered and can log in', 'success')
         return redirect(url_for('login'))
